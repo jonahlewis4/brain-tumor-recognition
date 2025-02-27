@@ -7,8 +7,8 @@ from sklearn.model_selection import train_test_split
 
 # Set up the directories where your images are stored.
 # Make sure to update these paths to where your actual image folders are located.
-tumor_dir = 'YESTUMORS'       # Directory with brains having tumors
-non_tumor_dir = 'NOTUMORS' # Directory with brains without tumors
+tumor_dir = 'archive/yes'       # Directory with brains having tumors
+non_tumor_dir = 'archive/no' # Directory with brains without tumors
 
 # Define the target size for the images (width, height). Feel free to adjust as needed.
 target_size = (256, 256)

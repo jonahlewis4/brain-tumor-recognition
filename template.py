@@ -1,17 +1,11 @@
 import os
-import numpy as np
-from PIL import Image
 import tensorflow as tf
-import matplotlib.pyplot as plt
-from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc
+import pandas as pd
+from PIL import Image
+import numpy as np
+from sklearn.model_selection import train_test_split
 
-
-###############################################################
-###############################################################
-#
-#                     MODEL GOES HERE
-#
-def MODEL_TRANSFORMATIONS(the_target_size) :
+def MODEL_TRANSFORMATIONS (the_target_size):
     return [
         tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(the_target_size[0], the_target_size[1], 1)),
         tf.keras.layers.MaxPooling2D((2, 2)),
@@ -24,12 +18,18 @@ def MODEL_TRANSFORMATIONS(the_target_size) :
         tf.keras.layers.Dropout(0.5),
         tf.keras.layers.Dense(1, activation='sigmoid')
     ]
-###############################################################
-###############################################################
 
-# Define the target size for the images (width, height)
+# Set up the directories where your images are stored.
+# Make sure to update these paths to where your actual image folders are located.
+tumor_dir = 'archive/yes'       # Directory with brains having tumors
+non_tumor_dir = 'archive/no' # Directory with brains without tumors
+
+# Define the target size for the images (width, height). Feel free to adjust as needed.
 target_size = (256, 256)
 
+# Lists to hold the image data and corresponding labels.
+data = []
+labels = []
 
 def process_images(directory, label):
     """
@@ -79,18 +79,7 @@ train_images, train_labels = prepare_data(train_df, target_size)
 test_images, test_labels = prepare_data(test_df, target_size)
 
 # Using keras we compile a CNN.
-model = tf.keras.models.Sequential([
-    tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(target_size[0], target_size[1], 1)),
-    tf.keras.layers.MaxPooling2D((2, 2)),
-    tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
-    tf.keras.layers.MaxPooling2D((2, 2)),
-    tf.keras.layers.Conv2D(128, (3, 3), activation='relu'),
-    tf.keras.layers.MaxPooling2D((2, 2)),
-    tf.keras.layers.Flatten(),
-    tf.keras.layers.Dense(128, activation='relu'),
-    tf.keras.layers.Dropout(0.5),
-    tf.keras.layers.Dense(1, activation='sigmoid')
-])
+model = tf.keras.models.Sequential(MODEL_TRANSFORMATIONS(target_size))
 
 # Compile the model.
 model.compile(optimizer='adam',
@@ -103,4 +92,3 @@ history = model.fit(train_images, train_labels, epochs=30, batch_size=30, valida
 # Evaluate the model on the test set.
 test_loss, test_acc = model.evaluate(test_images, test_labels)
 print("Test accuracy:", test_acc)
-

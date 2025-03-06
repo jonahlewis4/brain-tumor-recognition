@@ -31,72 +31,66 @@ def MODEL_TRANSFORMATIONS(the_target_size) :
 target_size = (256, 256)
 
 
-def load_dataset(data_dir):
+def process_images(directory, label):
     """
-    Loads images and labels from the given directory.
-    Assumes a structure like:
-      data_dir/
-         images/  - contains image files
-         labels/  - contains text files with labels (starting with '1' or '0')
+    Loads images from the specified directory, converts them to greyscale,
+    resizes them to the target size, and appends them to the global lists.
     """
-    images_folder = os.path.join(data_dir, 'images')
-    labels_folder = os.path.join(data_dir, 'labels')
-    data = []
-    labels = []
-
-    for filename in os.listdir(images_folder):
+    for filename in os.listdir(directory):
+        # Check for common image file extensions.
         if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-            img_path = os.path.join(images_folder, filename)
-            base_name = os.path.splitext(filename)[0]
-            label_file = os.path.join(labels_folder, base_name + '.txt')
+            img_path = os.path.join(directory, filename)
+            try:
+                # Open the image, convert it to greyscale, and resize it.
+                img = Image.open(img_path).convert('L')
+                img = img.resize(target_size)
+                # Convert the image to a NumPy array.
+                img_array = np.array(img)
+                data.append(img_array)
+                labels.append(label)
+            except Exception as e:
+                print(f"Could not process {img_path}: {e}")
 
-            if os.path.exists(label_file):
-                # Process the image
-                try:
-                    img = Image.open(img_path).convert('L')
-                    img = img.resize(target_size)
-                    img_array = np.array(img)
-                    data.append(img_array)
-                except Exception as e:
-                    print(f"Could not process image {img_path}: {e}")
-                    continue
+# Process images from both directories.
+process_images(tumor_dir, label=1)      # Label 1 indicates a tumor.
+process_images(non_tumor_dir, label=0)  # Label 0 indicates no tumor.
 
-                # Read the label from the text file
-                try:
-                    with open(label_file, 'r') as f:
-                        content = f.read().strip()
-                        # Assume label is the first character
-                        label = 1 if content.startswith('1') else 0
-                        labels.append(label)
-                except Exception as e:
-                    print(f"Could not read label from {label_file}: {e}")
-            else:
-                print(f"Label file {label_file} not found for image {img_path}")
+# Create a Pandas DataFrame with the image data and labels.
+df = pd.DataFrame({
+    'image': data,
+    'label': labels
+})
 
-    # Convert lists to numpy arrays
-    data = np.array(data)
-    labels = np.array(labels)
-    return data, labels
+# Split the DataFrame into training (80%) and testing (20%) sets.
+train_df, test_df = train_test_split(df, test_size=0.2, stratify=df['label'], random_state=65)
 
+print(f"Number of training samples: {len(train_df)}")
+print(f"Number of testing samples: {len(test_df)}")
 
-# Define paths for your training and testing data directories.
-# Update these paths to where your data actually is.
-train_data_dir = 'brain-tumor/train'  # Update this to your train directory path
-test_data_dir = 'brain-tumor/test'  # Update this to your test directory path
+# Preprocess the training and testing data
+# Stack the images and reshape to include channel dimension, then normalize.
+def prepare_data(df, target_size):
+    images = np.stack(df['image'].values)
+    images = images.reshape(-1, target_size[0], target_size[1], 1) / 255.0
+    labels = np.array(df['label'].values)
+    return images, labels
 
-# Load the datasets.
-train_images, train_labels = load_dataset(train_data_dir)
-test_images, test_labels = load_dataset(test_data_dir)
+train_images, train_labels = prepare_data(train_df, target_size)
+test_images, test_labels = prepare_data(test_df, target_size)
 
-print(f"Loaded {len(train_images)} train images and {len(test_images)} test images.")
-
-# Preprocess the data:
-# Reshape images to include the channel dimension (grayscale) and normalize pixel values.
-train_images = train_images.reshape(-1, target_size[0], target_size[1], 1) / 255.0
-test_images = test_images.reshape(-1, target_size[0], target_size[1], 1) / 255.0
-
-# Build a simple CNN model using TensorFlow's Keras API.
-model = tf.keras.models.Sequential(MODEL_TRANSFORMATIONS(target_size))
+# Using keras we compile a CNN.
+model = tf.keras.models.Sequential([
+    tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(target_size[0], target_size[1], 1)),
+    tf.keras.layers.MaxPooling2D((2, 2)),
+    tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+    tf.keras.layers.MaxPooling2D((2, 2)),
+    tf.keras.layers.Conv2D(128, (3, 3), activation='relu'),
+    tf.keras.layers.MaxPooling2D((2, 2)),
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dropout(0.5),
+    tf.keras.layers.Dense(1, activation='sigmoid')
+])
 
 # Compile the model.
 model.compile(optimizer='adam',
@@ -104,59 +98,9 @@ model.compile(optimizer='adam',
               metrics=['accuracy'])
 
 # Train the model.
-history = model.fit(train_images, train_labels, epochs=10, batch_size=32, validation_split=0.1)
+history = model.fit(train_images, train_labels, epochs=30, batch_size=30, validation_split=0.1)
 
 # Evaluate the model on the test set.
 test_loss, test_acc = model.evaluate(test_images, test_labels)
 print("Test accuracy:", test_acc)
-
-# --- Additional Stats & Visualization ---
-
-# Plot training & validation accuracy and loss by epoch.
-epochs_range = range(1, len(history.history['accuracy']) + 1)
-
-plt.figure(figsize=(12, 5))
-plt.subplot(1, 2, 1)
-plt.plot(epochs_range, history.history['accuracy'], label='Train Accuracy')
-plt.plot(epochs_range, history.history['val_accuracy'], label='Validation Accuracy')
-plt.xlabel('Epoch')
-plt.ylabel('Accuracy')
-plt.title('Train & Validation Accuracy')
-plt.legend()
-
-plt.subplot(1, 2, 2)
-plt.plot(epochs_range, history.history['loss'], label='Train Loss')
-plt.plot(epochs_range, history.history['val_loss'], label='Validation Loss')
-plt.xlabel('Epoch')
-plt.ylabel('Loss')
-plt.title('Train & Validation Loss')
-plt.legend()
-plt.tight_layout()
-plt.show()
-
-# Generate predictions on the test set.
-test_pred_prob = model.predict(test_images)
-test_pred = (test_pred_prob > 0.5).astype("int32")
-
-# Print a classification report.
-print("Classification Report:")
-print(classification_report(test_labels, test_pred))
-
-# Print a confusion matrix.
-print("Confusion Matrix:")
-print(confusion_matrix(test_labels, test_pred))
-
-# Plot ROC curve.
-fpr, tpr, thresholds = roc_curve(test_labels, test_pred_prob)
-roc_auc = auc(fpr, tpr)
-plt.figure()
-plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
-plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
-plt.xlim([0.0, 1.0])
-plt.ylim([0.0, 1.05])
-plt.xlabel('False Positive Rate')
-plt.ylabel('True Positive Rate')
-plt.title('Receiver Operating Characteristic')
-plt.legend(loc="lower right")
-plt.show()
 

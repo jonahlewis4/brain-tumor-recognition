@@ -5,6 +5,28 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc
 
+
+###############################################################
+###############################################################
+#
+#                     MODEL GOES HERE
+#
+def MODEL_TRANSFORMATIONS(the_target_size) :
+    return [
+        tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(the_target_size[0], the_target_size[1], 1)),
+        tf.keras.layers.MaxPooling2D((2, 2)),
+        tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+        tf.keras.layers.MaxPooling2D((2, 2)),
+        tf.keras.layers.Conv2D(128, (3, 3), activation='relu'),
+        tf.keras.layers.MaxPooling2D((2, 2)),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(128, activation='relu'),
+        tf.keras.layers.Dropout(0.5),
+        tf.keras.layers.Dense(1, activation='sigmoid')
+    ]
+###############################################################
+###############################################################
+
 # Define the target size for the images (width, height)
 target_size = (256, 256)
 
@@ -74,18 +96,7 @@ train_images = train_images.reshape(-1, target_size[0], target_size[1], 1) / 255
 test_images = test_images.reshape(-1, target_size[0], target_size[1], 1) / 255.0
 
 # Build a simple CNN model using TensorFlow's Keras API.
-model = tf.keras.models.Sequential([
-    tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(target_size[0], target_size[1], 1)),
-    tf.keras.layers.MaxPooling2D((2, 2)),
-    tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
-    tf.keras.layers.MaxPooling2D((2, 2)),
-    tf.keras.layers.Conv2D(128, (3, 3), activation='relu'),
-    tf.keras.layers.MaxPooling2D((2, 2)),
-    tf.keras.layers.Flatten(),
-    tf.keras.layers.Dense(128, activation='relu'),
-    tf.keras.layers.Dropout(0.5),
-    tf.keras.layers.Dense(1, activation='sigmoid')
-])
+model = tf.keras.models.Sequential(MODEL_TRANSFORMATIONS(target_size))
 
 # Compile the model.
 model.compile(optimizer='adam',
@@ -148,3 +159,4 @@ plt.ylabel('True Positive Rate')
 plt.title('Receiver Operating Characteristic')
 plt.legend(loc="lower right")
 plt.show()
+
